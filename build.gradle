@@ -1,0 +1,77 @@
+plugins {
+    id 'java'
+    id 'io.qameta.allure' version '2.8.1'
+}
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+
+def allureVersion = '2.20.1'
+def cucumberVersion = '7.11.0'
+def junitVersion = '5.9.2'
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+    testImplementation group: 'io.cucumber', name: 'cucumber-core', version: cucumberVersion
+    testImplementation("io.cucumber:cucumber-java:$cucumberVersion")
+    testImplementation("io.cucumber:cucumber-junit-platform-engine:$cucumberVersion")
+    testImplementation("org.junit.platform:junit-platform-suite:1.9.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
+    implementation ("io.qameta.allure:allure-cucumber7-jvm:$allureVersion")
+    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.30'
+    implementation group: 'org.seleniumhq.selenium', name: 'selenium-java', version: '3.141.59'
+    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.11.1'
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.11.1'
+    implementation group: 'io.rest-assured', name: 'rest-assured', version: '4.3.1'
+    implementation group: 'io.rest-assured', name: 'json-path', version: '4.3.1'
+}
+
+task AllTest(type: Test){
+    useJUnitPlatform{
+        excludeTags("skip")
+        if (project.hasProperty("includeTags")) includeTags(project.property("includeTags") as String)
+    }
+    systemProperties = System.properties
+    systemProperty("cucumber.publish.quiet", true)
+    systemProperty("cucumber.execution.parallel.enabled", true)
+    systemProperty("cucumber.execution.parallel.config.strategy", "fixed")
+    systemProperty("cucumber.execution.parallel.config.fixed.parallelism", System.properties.getProperty('threads', '3').toInteger())
+    systemProperty("cucumber.execution.exclusive-resources.isolated.read-write", "org.junit.platform.engine.support.hierarchical.ExclusiveResource.GLOBAL_KEY")
+    def cucumberReportPath = System.properties.getProperty('resultsDir', getBuildDir().toString())+'/../reports/cucumber-report.json'
+    def plugins = 'io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm, pretty, json:'+cucumberReportPath
+    systemProperty("cucumber.plugin", plugins)
+    include '**/parallel/**Tests.class'
+    exclude '**/utils/test/**Test.class'
+}
+
+allure {
+    version = allureVersion
+    autoconfigure = false
+    aspectjweaver = true
+    configuration = 'implementation'
+    resultsDir = new File(System.properties.getProperty('resultsDir', getBuildDir().toString() + "/allure-results"))
+    def allureRunnerJunit = System.properties.getProperty('allureRunnerJunit', "false")
+    if(allureRunnerJunit.toBoolean()) {
+        useJUnit5 { version = allureVersion }
+    }
+    else {
+        useCucumberJVM { version = allureVersion }
+    }
+}
+
+
+task UtilsTest(type: Test) {
+    useJUnitPlatform()
+    systemProperties System.getProperties()
+    include '**/utils/test/**Test.class'
+    exclude '**/parallel/**Tests.class'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
